@@ -4,6 +4,14 @@
 #include <stdio.h>
 #include <string.h>
 
+/*第三阶段新增内容*/
+#include "app_file.h"
+#include "app_draw.h"
+#include "app_music.h"
+#include "app_log.h"
+#include "app_monitor.h"
+#include "app_setting.h"
+
 /*桌面图标*/
 typedef struct{
     uint8_t     x,y;
@@ -39,11 +47,11 @@ static void render_boot(ui_model_t *p_m)
 {
     dev_oled_show_string(0,0,"DEVICE:");
     dev_oled_show_string(56,0,p_m->device_connected ? "NORMAL" : "ERROR!");
-    dev_oled_show_string(20,20,"Micro Desktop");
+    dev_oled_show_string(20,16,"Micro Desktop");
     char buf[16];
     snprintf(buf,sizeof(buf),"%02d:%02d:%02d",p_m->hour,p_m->minute,p_m->second);
-    dev_oled_show_string(30,40,buf);
-    dev_oled_show_string(8,56,"LONG KEY2->LOGIN");
+    dev_oled_show_string(30,32,buf);
+    dev_oled_show_string(0,48,"LONG KEY2->LOGIN");
 }
 
 static void render_login(ui_model_t *p_m)
@@ -76,7 +84,7 @@ static void render_lock(ui_model_t *p_m)
     dev_oled_show_string(30, 24, "LOCKED!");
 
     char buf[16];
-    sprintf(buf, "WAIT %ds", p_m->lock_remain_s);
+    snprintf(buf,sizeof(buf), "WAIT %ds", p_m->lock_remain_s);
     dev_oled_show_string(36, 40, buf);
 }
 
@@ -90,10 +98,11 @@ static void render_desktop(ui_model_t *p_m)
     {
         uint8_t x = s_icons[i].x;
         uint8_t y = s_icons[i].y;
-        uint8_t w = (uint8_t)(strlen(s_icons[i].name) * 6);
+        uint8_t w = (uint8_t)(strlen(s_icons[i].name) * 8);
         if(i == p_m->cursor_index)
         {
-            dev_oled_draw_rectangle(x-2,y-2,x+w+2,y+10,0);
+            dev_oled_draw_rectangle((uint8_t)(x-2),(uint8_t)(y-2),
+                                    (uint8_t)(x+w+1),(uint8_t)(y+17),0);
         }
         dev_oled_show_string(x,y,s_icons[i].name);
     }
@@ -120,6 +129,14 @@ void TaskUI(void *argument)
                 case SYS_STATE_LOGIN : render_login(&m); break;
                 case SYS_STATE_LOCK : render_lock(&m); break;
                 case SYS_STATE_DESKTOP : render_desktop(&m); break;
+
+                case SYS_STATE_APP_FILE : APP_File_Render(); break;
+                case SYS_STATE_APP_DRAW : APP_Draw_Render(); break;
+                case SYS_STATE_APP_MUSIC : APP_Music_Render(); break;
+                case SYS_STATE_APP_LOG : APP_Log_Render(); break;
+                case SYS_STATE_APP_MONITOR : APP_Monitor_Render(); break;
+                case SYS_STATE_APP_SETTING : APP_Setting_Render(); break;
+
                 default : break;
             }
             dev_oled_refresh_gram();

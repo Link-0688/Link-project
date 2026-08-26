@@ -34,6 +34,7 @@ typedef struct {
 void DEV_Music_Init(void);
 uint8_t DEV_Music_PushNote(Note_t note);
 void DEV_Music_TIM6_IRQHandler(void); // 定时器中断服务调用
-void DEV_Music_PlayLittleStar_Async(void);
+void DEV_Music_Stop(void);
+uint8_t DEV_Music_IsBusy(void);
 
 #endif /* __DEV_MUSIC_H */

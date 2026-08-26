@@ -24,6 +24,6 @@ void BSP_LED_Init(void)
 void BSP_LED_Set(led_channel_t ch,uint8_t on)
 {
     if(ch >= LED_NUM) return;
-    GPIO_PinState state = on ? GPIO_PIN_RESET : GPIO_PIN_SET;
+    GPIO_PinState state = on ? GPIO_PIN_RESET : GPIO_PIN_SET;   /*低电平点亮*/
     HAL_GPIO_WritePin(s_led_map[ch].port,s_led_map[ch].pin,state);
 }

@@ -20,12 +20,34 @@
 #include "bsp_sw_spi.h"
 #include "main.h"
 #include <stdio.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
 
 /* ================================================================
  * 全局显存: 8 页 × 128 列, 共 1024 字节
  * g_u8_oled_gram[page][col] 的 bit(n) → 像素 (col, page*8 + n)
  * ================================================================*/
 uint8_t g_u8_oled_gram[DEV_OLED_PAGES][DEV_OLED_WIDTH];
+
+/* SPI 总线互斥锁：TaskUI 整页刷新与 TaskSys 熄屏/对比度命令并发访问软件 SPI，
+ * 不加锁会导致 CS/DC 时序错乱 → 花屏/乱码 */
+static SemaphoreHandle_t s_oled_mutex = NULL;
+
+static void oled_spi_lock(void)
+{
+    if(s_oled_mutex != NULL)
+    {
+        xSemaphoreTake(s_oled_mutex, portMAX_DELAY);
+    }
+}
+
+static void oled_spi_unlock(void)
+{
+    if(s_oled_mutex != NULL)
+    {
+        xSemaphoreGive(s_oled_mutex);
+    }
+}
 
 /* ================================================================
  * 6×8 ASCII 字模 (空格 ' ' ~ '~', 95 字符)
@@ -343,18 +365,6 @@ static void dev_oled_write_cmd(uint8_t u8_cmd)
 }
 
 /* ================================================================
- * 内部函数: SPI 写数据 (单字节)
- * DC=1 → 数据模式, CS=0 使能, 发送 1 字节, CS=1 释放
- * ================================================================*/
-static void dev_oled_write_data(uint8_t u8_data)
-{
-    bsp_sw_spi_dc_high();
-    bsp_sw_spi_cs_low();
-    bsp_sw_spi_write_byte(u8_data);
-    bsp_sw_spi_cs_high();
-}
-
-/* ================================================================
  * 内部函数: SPI 批量写数据
  * 一次 CS 使能周期内连续发送 len 字节
  * 用于显存刷新, 每页 128 字节合并传输
@@ -440,6 +450,11 @@ static void dev_oled_send_init_sequence(void)
  * ================================================================*/
 void dev_oled_init(void)
 {
+    if(s_oled_mutex == NULL)
+    {
+        s_oled_mutex = xSemaphoreCreateMutex();
+    }
+
     /* 初始化 BSP 软件 SPI (所有 SPI GPIO 配置) */
     bsp_sw_spi_init();
 
@@ -455,6 +470,14 @@ void dev_oled_init(void)
     /* 清空显存并刷新 */
     dev_oled_clear();
     dev_oled_refresh_gram();
+}
+
+void dev_oled_set_contrast(uint8_t val)
+{
+    oled_spi_lock();
+    dev_oled_write_cmd(0x81);
+    dev_oled_write_cmd(val);
+    oled_spi_unlock();
 }
 
 /* ================================================================
@@ -478,10 +501,12 @@ void dev_oled_clear(void)
  * ================================================================*/
 void dev_oled_refresh_gram(void)
 {
+    oled_spi_lock();
     for (uint8_t u8_page = 0U; u8_page < DEV_OLED_PAGES; u8_page++) {
         dev_oled_set_cursor(u8_page, 0U);
         dev_oled_write_datas(g_u8_oled_gram[u8_page], DEV_OLED_WIDTH);
     }
+    oled_spi_unlock();
 }
 
 /* ================================================================
@@ -489,9 +514,11 @@ void dev_oled_refresh_gram(void)
  * ================================================================*/
 void dev_oled_display_on(void)
 {
+    oled_spi_lock();
     dev_oled_write_cmd(0x8D); /* 充电泵 ON */
     dev_oled_write_cmd(0x14);
     dev_oled_write_cmd(0xAF); /* 显示 ON */
+    oled_spi_unlock();
 }
 
 /* ================================================================
@@ -499,9 +526,11 @@ void dev_oled_display_on(void)
  * ================================================================*/
 void dev_oled_display_off(void)
 {
+    oled_spi_lock();
     dev_oled_write_cmd(0x8D); /* 充电泵 OFF */
     dev_oled_write_cmd(0x10);
     dev_oled_write_cmd(0xAE); /* 显示 OFF */
+    oled_spi_unlock();
 }
 
 /* ================================================================

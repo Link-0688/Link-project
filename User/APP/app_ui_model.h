@@ -21,7 +21,7 @@ typedef enum{
     SYS_STATE_NUM
 }sys_state_t;
 
-#define DESKTOP_ICON_NUM    6
+#define DESKTOP_ICON_NUM    6   /*icon:图标*/
 
 /*界面模型：TaskSys写，TaskUI读，互斥锁保护*/
 typedef struct{

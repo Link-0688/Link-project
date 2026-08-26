@@ -81,9 +81,12 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
 /* USER CODE BEGIN 4 */
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 {
-   /* Run time stack overflow checking is performed if
-   configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
-   called if a stack overflow is detected. */
+   /* 栈溢出检测：停机以便调试器定位溢出任务。
+    * 原为空实现，溢出后静默继续会引发随机 HardFault/崩溃，难以排查。 */
+   (void)xTask;
+   (void)pcTaskName;
+   taskDISABLE_INTERRUPTS();
+   for(;;);
 }
 /* USER CODE END 4 */
 

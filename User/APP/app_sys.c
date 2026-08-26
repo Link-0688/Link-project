@@ -5,6 +5,23 @@
 #include "dev_spi_oled.h"
 #include <stdio.h>
 
+/*第三阶段实现功能新增内容*/
+#include "app_file.h"
+#include "app_draw.h"
+#include "app_music.h"
+#include "app_log.h"
+#include "app_monitor.h"
+#include "app_setting.h"
+#include "dev_sd.h"
+#include "dev_config.h"
+#include "fatfs.h"
+
+static uint8_t s_sd_ready = 0;
+uint8_t APP_Sys_IsSdReady(void)
+{
+    return s_sd_ready;
+}
+
 #define PASSWORD_LEN    4
 
 static const uint8_t s_password[PASSWORD_LEN] = {1,2,2,4};
@@ -23,6 +40,7 @@ static sys_state_t get_state(void)
 }
 
 /*更新设备状态LED*/
+/*状态正常：绿灯亮  状态异常：红灯亮*/
 static void update_device_led(uint8_t connected)
 {
     if(connected)
@@ -46,6 +64,7 @@ static void enter_screen_off(void)
     g_ui_model.dirty = 1;
     APP_UIModel_Unlock();
     dev_oled_display_off();
+    APP_Log_Add("SLEEP");
 }
 
 static void wake_up(void)
@@ -55,6 +74,7 @@ static void wake_up(void)
     g_ui_model.dirty = 1;
     APP_UIModel_Unlock();
     dev_oled_display_on();
+    APP_Log_Add("WAKE");
 }
 
 /*登录处理*/
@@ -73,6 +93,7 @@ static void process_login(input_event_t *p_evt)
     if(p_evt->type != EVT_KEY_PRESS)    return;
     if(p_evt->param < KEY_1 || p_evt->param > KEY_4)    return;
     uint8_t digit = (uint8_t)(p_evt->param + 1);    /*KEY_1->数字1*/
+    const char *log_msg = NULL;    /*解锁后再记录，避免持锁时重入死锁*/
     APP_UIModel_Lock();
     g_ui_model.pwd_input[g_ui_model.pwd_len] = digit;
     g_ui_model.pwd_len ++;
@@ -95,6 +116,7 @@ static void process_login(input_event_t *p_evt)
             g_ui_model.error_count = 0;
             g_ui_model.state = SYS_STATE_DESKTOP;
             g_ui_model.cursor_index = 0;
+            log_msg = "LOGIN OK";
         }
         else
         {
@@ -108,10 +130,74 @@ static void process_login(input_event_t *p_evt)
                 g_ui_model.error_count = 0;
                 s_lock_start_tick = xTaskGetTickCount();
             }
+            log_msg = "LOGIN FAIL";
         }
     }
     APP_UIModel_Unlock();
+
+    if(log_msg != NULL)
+    {
+        APP_Log_Add(log_msg);
+    }
 }
+
+/*根据图表索引打开引用*/
+static void open_app(uint8_t index)
+{
+    APP_UIModel_Lock();
+    switch(index){
+        case 0 : g_ui_model.state = SYS_STATE_APP_FILE; APP_File_Init(); break;
+        case 1 : g_ui_model.state = SYS_STATE_APP_DRAW; APP_Draw_Init(); break;
+        case 2 : g_ui_model.state = SYS_STATE_APP_MUSIC; APP_Music_Init(); break;
+        case 3 : g_ui_model.state = SYS_STATE_APP_LOG; APP_Log_Open(); break;
+        case 4 : g_ui_model.state = SYS_STATE_APP_MONITOR; APP_Monitor_Init(); break;
+        case 5 : g_ui_model.state = SYS_STATE_APP_SETTING; APP_Setting_Init(); break;
+        default : break;
+    }
+    g_ui_model.dirty = 1;
+    APP_UIModel_Unlock();
+    APP_Log_Add("OPEN APP");
+}
+
+/*退出当前应用，回桌面*/
+static void exit_app(void)
+{
+    sys_state_t state;
+    APP_UIModel_Lock();
+    state = g_ui_model.state;
+    APP_UIModel_Unlock();
+    switch(state)
+    {
+        case SYS_STATE_APP_FILE : APP_File_Exit();  break;
+        case SYS_STATE_APP_DRAW : APP_Draw_Exit(); break;
+        case SYS_STATE_APP_MUSIC : APP_Music_Exit(); break;
+        case SYS_STATE_APP_LOG : APP_Log_Exit(); break;
+        case SYS_STATE_APP_MONITOR : APP_Monitor_Exit(); break;
+        case SYS_STATE_APP_SETTING : APP_Setting_Exit(); break;
+        default : break;
+    }
+
+    /*回到桌面*/
+    APP_UIModel_Lock();
+    g_ui_model.state = SYS_STATE_DESKTOP;
+    g_ui_model.dirty = 1;
+    APP_UIModel_Unlock();
+}
+
+/*把事件转发给当前应用*/
+static void app_handle_event(sys_state_t state,input_event_t *p_evt)
+{
+    switch(state){
+        case SYS_STATE_APP_FILE : APP_File_HandleEvent(p_evt);  break;
+        case SYS_STATE_APP_DRAW : APP_Draw_HandleEvent(p_evt);  break;
+        case SYS_STATE_APP_MUSIC : APP_Music_HandleEvent(p_evt);  break;
+        case SYS_STATE_APP_LOG : APP_Log_HandleEvent(p_evt);  break;
+        case SYS_STATE_APP_MONITOR : APP_Monitor_HandleEvent(p_evt);  break;
+        case SYS_STATE_APP_SETTING : APP_Setting_HandleEvent(p_evt);  break;
+        default : break;
+    }
+}
+
 
 /*桌面处理*/
 static void process_desktop(input_event_t *p_evt)
@@ -139,7 +225,11 @@ static void process_desktop(input_event_t *p_evt)
     }
     else if(p_evt->type == EVT_ENC_PRESS)
     {
-        printf("[SYS] open icon %d\r\n",g_ui_model.cursor_index);
+        uint8_t idx;
+        APP_UIModel_Lock();
+        idx = g_ui_model.cursor_index;
+        APP_UIModel_Unlock();
+        open_app(idx);
     }
 }
 
@@ -160,7 +250,38 @@ static void process_event(input_event_t *p_evt)
         case SYS_STATE_LOCK : break;    /*锁定期间忽略输入*/
         case SYS_STATE_DESKTOP : process_desktop(p_evt); break;
         case SYS_STATE_SCREEN_OFF : if(p_evt->type == EVT_KEY_LONG && p_evt->param == KEY_1) wake_up(); break;
+
+        case SYS_STATE_APP_FILE : 
+        case SYS_STATE_APP_DRAW : 
+        case SYS_STATE_APP_MUSIC : 
+        case SYS_STATE_APP_LOG : 
+        case SYS_STATE_APP_MONITOR : 
+        case SYS_STATE_APP_SETTING : 
+        if(p_evt->type == EVT_ENC_PRESS)    exit_app();
+        else    app_handle_event(state,p_evt);
+
         default : break;
+    }
+
+    if(p_evt->type == EVT_DEVICE_PLUG)
+    {
+        APP_UIModel_Lock();
+        g_ui_model.device_connected = 1;
+        g_ui_model.dirty = 1;
+        APP_UIModel_Unlock();
+        update_device_led(1);
+        APP_Log_Add("DEV PLUG");
+        return;
+    }
+    if(p_evt->type == EVT_DEVICE_UNPLUG)
+    {
+        APP_UIModel_Lock();
+        g_ui_model.device_connected = 0;
+        g_ui_model.dirty = 1;
+        APP_UIModel_Unlock();
+        update_device_led(0);
+        APP_Log_Add("DEV UNPLUG");
+        return;
     }
 }
 
@@ -191,9 +312,12 @@ static void process_timeout(void)
     /*超时熄屏*/
     if(state != SYS_STATE_SCREEN_OFF)
     {
-        uint16_t sleep_s = 30;  /*默认30秒*/
+        uint16_t sleep_s = DEV_Config_Get().sleep_time;
+        if(sleep_s < 5) sleep_s = 5;  /*下限保护，避免误触发*/
         if((xTaskGetTickCount() - s_last_active_tick) >= pdMS_TO_TICKS(sleep_s * 1000))
-        enter_screen_off();
+        {
+            enter_screen_off();
+        }
     }
 }
 
@@ -202,6 +326,29 @@ void TaskSys(void *argument)
 {
     (void)argument;
     APP_UIModel_Init();
+    APP_Log_Init();     /*日志环形缓冲只在上电时初始化一次*/
+    DEV_Config_Init();  /*先加载默认配置，后续 DEV_Config_Load 读到合法文件再覆盖*/
+
+    /*SD+FATFS+配置*/
+    if(DEV_SD_Init() == 0)
+    {
+        MX_FATFS_Init();
+        if(f_mount(&USERFatFS,"0:",1) == FR_OK)
+        {
+            s_sd_ready = 1;
+            DEV_Config_Load();
+            printf("[SYS] SD + FATFS OK\r\n");
+        }
+        else
+        {
+            printf("[SYS] f_mount FAIL\r\n");
+        }
+    }
+    else
+    {
+        printf("[sys] f_mount FAIL\r\n");
+    }
+
     BSP_LED_Init();
     update_device_led(1);
     s_last_active_tick = xTaskGetTickCount();

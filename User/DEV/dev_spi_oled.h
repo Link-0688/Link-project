@@ -46,6 +46,7 @@ void dev_oled_init(void);
 void dev_oled_clear(void);
 void dev_oled_display_on(void);
 void dev_oled_display_off(void);
+void dev_oled_set_contrast(uint8_t val);   /* 0~255 */
 void dev_oled_refresh_gram(void);
 
 /* ================================================================

@@ -62,6 +62,12 @@ ${CMAKE_SOURCE_DIR}/User/APP/app_event.c
 ${CMAKE_SOURCE_DIR}/User/APP/app_ui.c
 ${CMAKE_SOURCE_DIR}/User/APP/app_sys.c
 ${CMAKE_SOURCE_DIR}/User/APP/app_ui_model.c
+${CMAKE_SOURCE_DIR}/User/APP/app_draw.c
+${CMAKE_SOURCE_DIR}/User/APP/app_file.c
+${CMAKE_SOURCE_DIR}/User/APP/app_music.c
+${CMAKE_SOURCE_DIR}/User/APP/app_log.c
+${CMAKE_SOURCE_DIR}/User/APP/app_monitor.c
+${CMAKE_SOURCE_DIR}/User/APP/app_setting.c
 )
 
 # Add include paths

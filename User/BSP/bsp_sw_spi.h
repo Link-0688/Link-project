@@ -7,7 +7,7 @@
  *   用于 ELC-F4 开发板板载 SPI OLED (HS96L01W4S03)
  *   仅实现 MOSI 发送, 无 MISO 接收 (OLED 是单向写入)
  *
- * 引脚: PE9=DC, PE10=CS, PE11=SCK, PE12=MOSI, PE13=RES
+ * 引脚: PE9=SCK, PE10=MOSI, PE11=RES, PE12=DC, PE13=CS
  *
  * 依赖: main.h (HAL 库)
  * 架构分层: APP → DEV → BSP (本层) → HAL
