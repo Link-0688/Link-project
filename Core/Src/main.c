@@ -101,6 +101,7 @@ int main(void)
   MX_TIM6_Init();
   MX_USART1_UART_Init();
   MX_FATFS_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
   BSP_SPI2_Init();
   /* USER CODE END 2 */
@@ -172,7 +173,18 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* FreeRTOS 启动时通过 portCONFIGURE_TIMER_FOR_RUN_TIME_STATS 调用：初始化并启动 TIM5 */
+void vConfigureTimerForRunTimeStats(void)
+{
+  MX_TIM5_Init();
+  HAL_TIM_Base_Start(&htim5);
+}
 
+/* 返回当前运行时间计数器值(µs)，供 FreeRTOS 统计各任务运行时间占比 */
+uint32_t ulGetRunTimeCounterValue(void)
+{
+  return (uint32_t)(TIM5->CNT);
+}
 /* USER CODE END 4 */
 
 /**
