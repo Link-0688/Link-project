@@ -78,6 +78,7 @@
 #define configUSE_RECURSIVE_MUTEXES              1
 #define configUSE_COUNTING_SEMAPHORES            1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION  0
+#define configUSE_TRACE_FACILITY                 1
 #define configUSE_STATS_FORMATTING_FUNCTIONS     1
 #define configGENERATE_RUN_TIME_STATS            1
 /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
