@@ -35,10 +35,17 @@ void APP_Monitor_HandleEvent(input_event_t *p_evt)
         /*KEY3在任务列表页和CPU占用页之间切换*/
         s_page = (uint8_t)(1 - s_page);
         s_scroll = 0;
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_ENC_LEFT && s_scroll < s_max_scroll)
     {
         s_scroll++;
+        g_ui_model.dirty = 1;
+    }
+    else if(p_evt->type == EVT_ENC_RIGHT && s_scroll > 0)
+    {
+        s_scroll--;
+        g_ui_model.dirty = 1;
     }
     APP_UIModel_Unlock();
 }

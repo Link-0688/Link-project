@@ -2,6 +2,7 @@
 #include "app_ui_model.h"
 #include "dev_spi_oled.h"
 #include "dev_music.h"
+#include "dev_config.h"
 #include "bsp_key.h"
 #include <stdio.h>
 #include "tim.h"
@@ -72,6 +73,7 @@ void APP_Music_Init(void)
     s_playing = 0;
 
     BSP_Buzzer_Init();
+    BSP_Buzzer_SetVolume(DEV_Config_Get().volume);
     DEV_Music_Init();
 
     HAL_TIM_Base_Start_IT(&htim6);
@@ -90,19 +92,23 @@ void APP_Music_HandleEvent(input_event_t *p_evt)
     if(p_evt->type == EVT_ENC_RIGHT)
     {
         s_current = (uint8_t)((s_current + 1) % SONG_NUM);
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_ENC_LEFT)
     {
         s_current = (uint8_t)((s_current + SONG_NUM - 1) % SONG_NUM);
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_3)
     {
         play_song(s_current);
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_4)
     {
         DEV_Music_Stop();
         s_playing = 0;
+        g_ui_model.dirty = 1;
     }
     APP_UIModel_Unlock();
 }

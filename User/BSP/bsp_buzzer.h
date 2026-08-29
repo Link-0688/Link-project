@@ -9,6 +9,7 @@
 
 void BSP_Buzzer_Init(void);
 void BSP_Buzzer_SetFrequency(uint32_t freq_hz);
+void BSP_Buzzer_SetVolume(uint8_t volome);
 void BSP_Buzzer_Stop(void);
 
 #endif /* __BSP_BUZZER_H */

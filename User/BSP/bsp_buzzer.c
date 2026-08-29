@@ -1,9 +1,17 @@
 #include "bsp_buzzer.h"
 #include "tim.h"
 
+static uint8_t s_volume = 50;
+
 void BSP_Buzzer_Init(void)
 {
     HAL_TIM_PWM_Stop(&BSP_BUZZER_TIM, BSP_BUZZER_CHANNEL);
+}
+
+void BSP_Buzzer_SetVolume(uint8_t volume)
+{
+    if(volume > 100)    volume = 100;
+    s_volume = volume;
 }
 
 void BSP_Buzzer_SetFrequency(uint32_t freq_hz)
@@ -13,9 +21,15 @@ void BSP_Buzzer_SetFrequency(uint32_t freq_hz)
         BSP_Buzzer_Stop();
         return;
     }
+    if (s_volume == 0)
+    {
+        BSP_Buzzer_Stop();
+        return;
+    }
 
     uint32_t arr = (BSP_BUZZER_CLK_HZ / freq_hz) - 1;
-    uint32_t ccr = arr / 2;
+    uint32_t ccr = arr * s_volume / 200;
+    if(ccr == 0)    ccr = 1;
 
     __HAL_TIM_SET_AUTORELOAD(&BSP_BUZZER_TIM, arr);
     __HAL_TIM_SET_COMPARE(&BSP_BUZZER_TIM, BSP_BUZZER_CHANNEL, ccr);

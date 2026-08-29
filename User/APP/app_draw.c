@@ -14,6 +14,7 @@
 static uint8_t g_draw_canvas[8][128];   /*独立画布，不直接用显存*/
 static uint8_t s_cursor_x;
 static uint8_t s_cursor_y;
+static uint8_t s_clear_confirm; /*0 = 正常 1 = 清空确认*/
 
 /*画布像素操作*/
 static void canvas_set_pixel(uint8_t x,uint8_t y)
@@ -61,6 +62,7 @@ void APP_Draw_Init(void)
     memset(g_draw_canvas,0,CANVAS_BYTES);
     s_cursor_x = 64;
     s_cursor_y = 32;
+    s_clear_confirm = 0;
     load_canvas();
 }
 
@@ -109,33 +111,67 @@ void APP_Draw_HandleEvent(input_event_t *p_evt)
     if(sens == 0) sens = 1;
 
     APP_UIModel_Lock();
+    /*清空确认*/
+    if(s_clear_confirm)
+    {
+        if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_1)
+        {
+            memset(g_draw_canvas,0,CANVAS_BYTES);
+            save_canvas();
+            s_clear_confirm = 0;
+            g_ui_model.dirty = 1;
+        }
+        else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_2)
+        {
+            s_clear_confirm = 0;
+            g_ui_model.dirty = 1;
+        }
+        APP_UIModel_Unlock();
+        return;
+    }
+
+    /*长按KEY_3进入清空确认*/
+    if(p_evt->type == EVT_KEY_LONG && p_evt->param ==KEY_3)
+    {
+        s_clear_confirm = 1;
+        g_ui_model.dirty = 1;
+        APP_UIModel_Unlock();
+        return;
+    }
+
     if(p_evt->type == EVT_ENC_RIGHT)
     {
         int16_t step = (int16_t)(p_evt->param * sens);
         if(s_cursor_x + step < CANVAS_W)    s_cursor_x = (uint8_t)(s_cursor_x + step);
         else s_cursor_x = CANVAS_W - 1;
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_ENC_LEFT)
     {
         int16_t step = (int16_t)(p_evt->param * sens);
         if(s_cursor_x >= step)  s_cursor_x = (uint8_t)(s_cursor_x - step);
         else s_cursor_x = 0;
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_1)
     {
         if(s_cursor_y > 0)  s_cursor_y--;
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_2)
     {
         if(s_cursor_y < CANVAS_H - 1)   s_cursor_y++;
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_3)
     {
         draw_brush();   /*落笔*/
+        g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_4)
     {
         erase_brush();  /*擦除*/
+        g_ui_model.dirty = 1;
     }
     APP_UIModel_Unlock();
 }
@@ -150,4 +186,14 @@ void APP_Draw_Render(void)
     int16_t x0 = (int16_t)x - 1; if(x0 < 0) x0 = 0;
     int16_t y0 = (int16_t)y - 1; if(y0 < 0) y0 = 0;
     dev_oled_draw_rectangle((uint8_t)x0, (uint8_t)y0, (uint8_t)(x + 1), (uint8_t)(y + 1), 0);
+    /*3.界面清除*/
+    {
+        if(s_clear_confirm)
+        {
+            dev_oled_show_string(0,0,"CLEAR ALL?");
+            dev_oled_show_string(0,24,"1 = YES");
+            dev_oled_show_string(0,40,"2 = NO");
+            return;
+        }
+    }
 }

@@ -114,6 +114,10 @@ void TaskUI(void *argument)
     (void)argument;
     dev_oled_init();
     dev_oled_clear();
+    dev_oled_refresh_gram();    /*初始全屏刷新一次*/
+
+    uint8_t last_second = 0xFF; /*上次渲染的秒, 用于秒级时钟刷新*/
+    
     for(;;)
     {
         APP_UIModel_Lock();
@@ -122,24 +126,37 @@ void TaskUI(void *argument)
         read_rtc(&m);
         if(m.state != SYS_STATE_SCREEN_OFF)
         {
-            dev_oled_clear();
-            switch(m.state)
+            /*仅当模型 dirty 或秒数变化时才渲染, 否则跳过(省 SPI 传输)*/
+            if(m.dirty || m.second != last_second)
             {
-                case SYS_STATE_BOOT : render_boot(&m); break;
-                case SYS_STATE_LOGIN : render_login(&m); break;
-                case SYS_STATE_LOCK : render_lock(&m); break;
-                case SYS_STATE_DESKTOP : render_desktop(&m); break;
+                /*先消费 dirty, 再渲染; 渲染期间新置的 dirty 留给下一帧*/
+                if(m.dirty)
+                {
+                    APP_UIModel_Lock();
+                    g_ui_model.dirty = 0;
+                    APP_UIModel_Unlock();
+                }
 
-                case SYS_STATE_APP_FILE : APP_File_Render(); break;
-                case SYS_STATE_APP_DRAW : APP_Draw_Render(); break;
-                case SYS_STATE_APP_MUSIC : APP_Music_Render(); break;
-                case SYS_STATE_APP_LOG : APP_Log_Render(); break;
-                case SYS_STATE_APP_MONITOR : APP_Monitor_Render(); break;
-                case SYS_STATE_APP_SETTING : APP_Setting_Render(); break;
+                dev_oled_clear();
+                switch(m.state)
+                {
+                    case SYS_STATE_BOOT : render_boot(&m); break;
+                    case SYS_STATE_LOGIN : render_login(&m); break;
+                    case SYS_STATE_LOCK : render_lock(&m); break;
+                    case SYS_STATE_DESKTOP : render_desktop(&m); break;
 
-                default : break;
+                    case SYS_STATE_APP_FILE : APP_File_Render(); break;
+                    case SYS_STATE_APP_DRAW : APP_Draw_Render(); break;
+                    case SYS_STATE_APP_MUSIC : APP_Music_Render(); break;
+                    case SYS_STATE_APP_LOG : APP_Log_Render(); break;
+                    case SYS_STATE_APP_MONITOR : APP_Monitor_Render(); break;
+                    case SYS_STATE_APP_SETTING : APP_Setting_Render(); break;
+
+                    default : break;
+                }
+                dev_oled_refresh_gram();
+                last_second = m.second;
             }
-            dev_oled_refresh_gram();
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }

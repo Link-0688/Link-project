@@ -28,7 +28,7 @@
  * g_u8_oled_gram[page][col] 的 bit(n) → 像素 (col, page*8 + n)
  * ================================================================*/
 uint8_t g_u8_oled_gram[DEV_OLED_PAGES][DEV_OLED_WIDTH];
-
+static uint8_t s_gram_dirty = 0;
 /* SPI 总线互斥锁：TaskUI 整页刷新与 TaskSys 熄屏/对比度命令并发访问软件 SPI，
  * 不加锁会导致 CS/DC 时序错乱 → 花屏/乱码 */
 static SemaphoreHandle_t s_oled_mutex = NULL;
@@ -490,6 +490,7 @@ void dev_oled_clear(void)
             g_u8_oled_gram[u8_page][u8_col] = 0x00U;
         }
     }
+    s_gram_dirty = 0xFF;    /*清屏后全屏待刷*/
 }
 
 /* ================================================================
@@ -506,6 +507,7 @@ void dev_oled_refresh_gram(void)
         dev_oled_set_cursor(u8_page, 0U);
         dev_oled_write_datas(g_u8_oled_gram[u8_page], DEV_OLED_WIDTH);
     }
+    s_gram_dirty = 0;   /*刷完清零*/
     oled_spi_unlock();
 }
 
@@ -553,6 +555,7 @@ void dev_oled_draw_point(uint8_t x, uint8_t y, uint8_t t)
     } else {
         g_u8_oled_gram[u8_page][x] &= (uint8_t)(~(1U << u8_bit));
     }
+    s_gram_dirty |= (uint8_t)(1U << u8_page);   /*标记该页脏*/
 }
 
 /* ================================================================
@@ -691,6 +694,11 @@ static void dev_oled_clear_char_area(uint8_t x, uint8_t y, uint8_t w, uint8_t h)
             g_u8_oled_gram[page][u8_cur_x] &= (uint8_t)(~u8_mask);
         }
     }
+    for (uint8_t page = u8_page_start; page <= u8_page_end; page++) {
+      if (page < DEV_OLED_PAGES) {
+        s_gram_dirty |= (uint8_t)(1U << page);
+      }
+  }  
 }
 
 /* ================================================================
