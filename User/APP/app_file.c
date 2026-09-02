@@ -60,14 +60,11 @@ static uint8_t scan_files(void)
     return 1;
 }
 
-/*重名检测：文件名已存在返回1*/
+/*重名检测：直接查文件系统，不受 s_files(仅缓存前 FILE_LIST_MAX 个) 限制*/
 static uint8_t name_exists(const char *name)
 {
-    for(uint16_t i = 0; i < s_file_count; i++)
-    {
-        if(strcmp(s_files[i].name,name) == 0)   return 1;
-    }
-    return 0;
+    FILINFO fno;
+    return (f_stat(name, &fno) == FR_OK) ? 1 : 0;
 }
 
 /*生成下一个不重名的自动文件名FILE001.TXT*/

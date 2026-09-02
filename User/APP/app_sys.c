@@ -1,7 +1,8 @@
 #include "app_event.h"
 #include "app_ui_model.h"
+#include "app_health.h"
 #include "bsp_key.h"
-#include "bsp_led.h"
+#include "dev_status_led.h"
 #include "dev_spi_oled.h"
 #include <stdio.h>
 
@@ -45,13 +46,11 @@ static void update_device_led(uint8_t connected)
 {
     if(connected)
     {
-        BSP_LED_Set(LED_GREEN,1);
-        BSP_LED_Set(LED_RED,0);
+        DEV_StatusLed_SetMode(LED_MODE_GREEN_BREATH);   /* 正常: 绿灯呼吸 */
     }
     else
     {
-        BSP_LED_Set(LED_GREEN,0);
-        BSP_LED_Set(LED_RED,1);
+        DEV_StatusLed_SetMode(LED_MODE_RED_FLASH);      /* 异常: 红灯快闪 */
     }
 }
 
@@ -64,6 +63,7 @@ static void enter_screen_off(void)
     g_ui_model.dirty = 1;
     APP_UIModel_Unlock();
     dev_oled_display_off();
+    DEV_StatusLed_SetMode(LED_MODE_OFF);
     APP_Log_Add("SLEEP");
 }
 
@@ -74,6 +74,7 @@ static void wake_up(void)
     g_ui_model.dirty = 1;
     APP_UIModel_Unlock();
     dev_oled_display_on();
+    update_device_led(g_ui_model.device_connected); 
     APP_Log_Add("WAKE");
 }
 
@@ -165,7 +166,11 @@ static void exit_app(void)
     sys_state_t state;
     APP_UIModel_Lock();
     state = g_ui_model.state;
+    /*先切回桌面并置脏，让 TaskUI 立即响应，避免保存 SD 卡阻塞造成"1秒才返回"*/
+    g_ui_model.state = SYS_STATE_DESKTOP;
+    g_ui_model.dirty = 1;
     APP_UIModel_Unlock();
+
     switch(state)
     {
         case SYS_STATE_APP_FILE : APP_File_Exit();  break;
@@ -176,12 +181,6 @@ static void exit_app(void)
         case SYS_STATE_APP_SETTING : APP_Setting_Exit(); break;
         default : break;
     }
-
-    /*回到桌面*/
-    APP_UIModel_Lock();
-    g_ui_model.state = SYS_STATE_DESKTOP;
-    g_ui_model.dirty = 1;
-    APP_UIModel_Unlock();
 }
 
 /*把事件转发给当前应用*/
@@ -349,12 +348,13 @@ void TaskSys(void *argument)
         printf("[sys] f_mount FAIL\r\n");
     }
 
-    BSP_LED_Init();
+    DEV_StatusLed_Init();
     update_device_led(1);
     s_last_active_tick = xTaskGetTickCount();
     printf("[SYS] start\r\n");
     for(;;)
     {
+        APP_Health_Beat(HEART_SYS);
         input_event_t evt;
         BaseType_t ret = xQueueReceive(g_input_queue,&evt,pdMS_TO_TICKS(1000));
         if(ret == pdPASS)

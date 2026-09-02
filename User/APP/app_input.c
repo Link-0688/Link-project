@@ -1,6 +1,7 @@
 #include "app_event.h"
 #include "app_input.h"
 #include "dev_ec11.h"
+#include "app_health.h"
 #include "bsp_key.h"
 #include "timers.h"
 #include <stdio.h>
@@ -19,7 +20,7 @@
 #define NOTIFY_DETECT 0x02U /*检测线*/
 
 static TaskHandle_t s_input_task = NULL; /*TaskInput自身句柄，供ISR通知*/
-static TimerHandle_t s_long_timer = NULL; /*长按软件定时器*/
+static TimerHandle_t s_long_timer[KEY_NUM]; /*每键独立长按定时器*/
 
 /*消抖后的稳定状态：0 = 松开，1 = 按下*/
 static uint8_t s_key_state[KEY_NUM];    /*KEY1~4*/
@@ -33,19 +34,18 @@ static void long_press_cb(TimerHandle_t xTimer)
     APP_Event_Send(EVT_KEY_LONG,param);
 }
 
-/*启动长按定时器*/
-static void start_long_press(int16_t param)
+/*启动指定键的长按定时器*/
+static void start_long_press(int16_t key)
 {
-    if(s_long_timer == NULL)    return;
-    vTimerSetTimerID(s_long_timer,(void*)(intptr_t)param);
-    xTimerReset(s_long_timer,0);
+    if(s_long_timer[key] == NULL)    return;
+    xTimerReset(s_long_timer[key],0);
 }
 
-/*停止长按定时器(防止误发LONG)*/
-static void stop_long_press(void)
+/*停止指定键的长按定时器(防止误发LONG)*/
+static void stop_long_press(int16_t key)
 {
-    if(s_long_timer == NULL)    return;
-    xTimerStop(s_long_timer,0);
+    if(s_long_timer[key] == NULL)    return;
+    xTimerStop(s_long_timer[key],0);
 }
 
 /*HAL EXTI回调：用任务通知唤醒TaskInput去消抖判边沿*/
@@ -88,7 +88,7 @@ static void scan_keys(void)
             else
             {
                 APP_Event_Send(EVT_KEY_RELEASE, (int16_t)i);
-                stop_long_press();
+                stop_long_press((int16_t) i);
             }
         }
     }
@@ -136,11 +136,13 @@ void TaskInput(void *argument)
 {
     (void)argument;
     s_input_task = xTaskGetCurrentTaskHandle();
-    /*长按定时器：超时回调发EVT_KEY_LONG*/
-    s_long_timer = xTimerCreate("long",pdMS_TO_TICKS(LONG_PRESS_MS),pdFALSE,(void*)0,long_press_cb);
+    /*长按定时器：每键一个，超时回调发EVT_KEY_LONG*/
+    for(uint8_t i = 0; i < KEY_NUM; i++)
+        s_long_timer[i] = xTimerCreate("long",pdMS_TO_TICKS(LONG_PRESS_MS),pdFALSE,(void*)(intptr_t)i,long_press_cb);
     printf("[INPUT]start\r\n");
     for(;;)
     {
+        APP_Health_Beat(HEART_INPUT);   /*输入任务心跳 */
         uint32_t notify = 0;
         BaseType_t ret = xTaskNotifyWait(0x00000000,0xFFFFFFFF,&notify,pdMS_TO_TICKS(ENC_POLL_MS));
         if(ret == pdPASS)

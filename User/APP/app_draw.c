@@ -2,6 +2,7 @@
 #include "app_ui_model.h"
 #include "app_sys.h"
 #include "dev_spi_oled.h"
+#include "dev_storage.h"
 #include "dev_config.h"
 #include "bsp_key.h"
 #include "ff.h"
@@ -33,27 +34,15 @@ static void canvas_clear_pixel(uint8_t x,uint8_t y)
 static void save_canvas(void)
 {
     if(!APP_Sys_IsSdReady())    return;
-    FIL file;
-    UINT bw = 0;
-    if(f_open(&file,"DRAW.PIC",FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
-    {
-        f_write(&file,g_draw_canvas,CANVAS_BYTES,&bw);
-        f_close(&file);
-    }
+    DEV_Storage_Write("DRAW.PIC", (const uint8_t*)g_draw_canvas, CANVAS_BYTES);
 }
 
 static void load_canvas(void)
 {
     if(!APP_Sys_IsSdReady())    return;
-    FIL file;
-    UINT br = 0;
-    if(f_open(&file,"DRAW.PIC",FA_READ) == FR_OK)
+    if(!DEV_Storage_Read("DRAW.PIC", (uint8_t*)g_draw_canvas, CANVAS_BYTES))  
     {
-        if(f_read(&file,g_draw_canvas,CANVAS_BYTES,&br) != FR_OK || br != CANVAS_BYTES)
-        {
-            memset(g_draw_canvas,0,CANVAS_BYTES);
-        }
-        f_close(&file);
+        memset(g_draw_canvas, 0, CANVAS_BYTES);   /* 损坏/不存在 -> 空画布 */
     }
 }
 
@@ -185,7 +174,9 @@ void APP_Draw_Render(void)
     uint8_t y = s_cursor_y;
     int16_t x0 = (int16_t)x - 1; if(x0 < 0) x0 = 0;
     int16_t y0 = (int16_t)y - 1; if(y0 < 0) y0 = 0;
-    dev_oled_draw_rectangle((uint8_t)x0, (uint8_t)y0, (uint8_t)(x + 1), (uint8_t)(y + 1), 0);
+    uint8_t x1 = (x + 1 < CANVAS_W) ? (uint8_t)(x + 1) : (uint8_t)(CANVAS_W - 1);
+    uint8_t y1 = (y + 1 < CANVAS_H) ? (uint8_t)(y + 1) : (uint8_t)(CANVAS_H - 1);
+    dev_oled_draw_rectangle((uint8_t)x0, (uint8_t)y0, x1, y1, 0);
     /*3.界面清除*/
     {
         if(s_clear_confirm)

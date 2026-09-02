@@ -29,6 +29,19 @@ static void apply_brightness(void)
     dev_oled_set_contrast(contrast);
 }
 
+/*让滚动窗口跟随选中项，处理回绕：选中项滚出顶部或底部时整屏跟随*/
+static void scroll_to_item(void)
+{
+    if(s_item < s_scroll)
+    {
+        s_scroll = s_item;
+    }
+    else if(s_item >= (uint8_t)(s_scroll + SET_VISIBLE_ROWS))
+    {
+        s_scroll = (uint8_t)(s_item - SET_VISIBLE_ROWS + 1);
+    }
+}
+
 void APP_Setting_Init(void)
 {
     s_cfg = DEV_Config_Get();
@@ -54,26 +67,19 @@ void APP_Setting_HandleEvent(input_event_t *p_evt)
         if(p_evt->type == EVT_ENC_RIGHT)
         {
             s_item = (uint8_t)((s_item + 1) % SET_NUM);
-            /*窗口跟随：选中项滚出底部可见区时, 整屏下移*/
-            if(s_item >= (uint8_t)(s_scroll + SET_VISIBLE_ROWS))
-            {
-                s_scroll = (uint8_t)(s_item - SET_VISIBLE_ROWS + 1);
-            }
+            scroll_to_item();
             g_ui_model.dirty = 1;
         }
         else if(p_evt->type == EVT_ENC_LEFT)
         {
             s_item = (uint8_t)((s_item + SET_NUM - 1) % SET_NUM);
-            /*窗口跟随：选中项滚出顶部可见区时, 整屏上移*/
-            if(s_item < s_scroll)
-            {
-                s_scroll = s_item;
-            }
+            scroll_to_item();
             g_ui_model.dirty = 1;
         }
         else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_3)
         {
             s_edit = 1;/*进入编辑*/
+            g_ui_model.dirty = 1;
         }
     }
     else

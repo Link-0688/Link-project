@@ -103,7 +103,7 @@ void APP_Log_HandleEvent(input_event_t *p_evt)
     }
     else if(p_evt->type == EVT_ENC_LEFT)
     {
-        if(s_scroll < s_log_count - 1)  s_scroll++;
+        if(s_log_count > 0 && s_scroll < s_log_count - 1)  s_scroll++;
         g_ui_model.dirty = 1;
     }
     else if(p_evt->type == EVT_KEY_PRESS && p_evt->param == KEY_4)

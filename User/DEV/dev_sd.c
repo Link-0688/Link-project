@@ -1,7 +1,12 @@
 #include "dev_sd.h"
 #include <stdio.h>
 
-static uint8_t SD_Type = SD_TYPE_ERR;
+/* 初始化完成后切换到高速 SPI，加速 FATFS 读写（落盘阻塞是"1秒返回"/心跳超时的根因） */
+static void SD_EnableFastSpi(void)
+{
+    /* BR=001 -> APB1(42MHz)/4 = 10.5MHz */
+    MODIFY_REG(hspi2.Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_4);
+}
 
 /* 发送命令帧 + 等 R1（含完整 CS↑→dummy→CS↓ 序列） */
 static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg, uint8_t crc)
@@ -94,8 +99,8 @@ uint8_t DEV_SD_Init(void)
         return 1;
     }
 
-    SD_Type = (buf[0] & 0x40) ? SD_TYPE_V2HC : SD_TYPE_V2HC;
     SPI2_CS_HIGH();
+    SD_EnableFastSpi();
     printf("[SD] Init OK (%s)\r\n", (buf[0] & 0x40) ? "SDHC" : "SDSC");
     return 0;
 }
@@ -159,5 +164,32 @@ uint8_t DEV_SD_WriteDisk(const uint8_t *buf, uint32_t sector, uint32_t count)
 
 uint32_t DEV_SD_GetSectorCount(void)
 {
-    return 15000000;
+    uint8_t csd[16];
+    uint8_t r1 = SD_SendCmd(CMD9, 0, 0xFF);
+    if (r1 != 0x00) { SPI2_CS_HIGH(); return 0; }
+
+    /* 等待数据令牌 0xFE */
+    uint32_t retry = 0;
+    uint8_t  token;
+    do {
+        token = BSP_SPI2_ReadWriteByte(0xFF);
+        if (++retry > 200000) { SPI2_CS_HIGH(); return 0; }
+    } while (token != 0xFE);
+
+    for (int i = 0; i < 16; i++)
+        csd[i] = BSP_SPI2_ReadWriteByte(0xFF);
+    BSP_SPI2_ReadWriteByte(0xFF);   /* CRC 高字节 */
+    BSP_SPI2_ReadWriteByte(0xFF);   /* CRC 低字节 */
+    SPI2_CS_HIGH();
+
+    /* CSD v2.0 (SDHC/SDXC)：C_SIZE 为 22 位，容量(块) = (C_SIZE+1)*1024 */
+    uint8_t csd_ver = (uint8_t)((csd[0] >> 6) & 0x03);
+    if (csd_ver == 1)
+    {
+        uint32_t c_size = ((uint32_t)(csd[7] & 0x3F) << 16) |
+                          ((uint32_t)csd[8] << 8) |
+                          (uint32_t)csd[9];
+        return (c_size + 1) * 1024;
+    }
+    return 0;   /* CSD v1.0(SDSC) 或未知：CMD8 已拒绝老卡，返回 0 */
 }

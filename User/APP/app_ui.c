@@ -1,4 +1,5 @@
 #include "app_ui_model.h"
+#include "app_health.h"
 #include "dev_spi_oled.h"
 #include "rtc.h"
 #include <stdio.h>
@@ -122,6 +123,7 @@ void TaskUI(void *argument)
     {
         APP_UIModel_Lock();
         ui_model_t m = g_ui_model;/*渲染用局部数据*/
+        APP_Health_Beat(HEART_UI);
         APP_UIModel_Unlock();
         read_rtc(&m);
         if(m.state != SYS_STATE_SCREEN_OFF)

@@ -16,14 +16,16 @@ void DEV_Music_Init(void)
 
 uint8_t DEV_Music_PushNote(Note_t note)
 {
+    /* 整体进临界区：判满/写 buffer/推进 tail/count++ 必须原子，
+     * 否则与 TIM6 中断里消费 head/count 存在竞态 */
+    __disable_irq();
     if (music_rb.count >= MUSIC_BUFFER_SIZE)
     {
+        __enable_irq();
         return 0;
     }
     music_rb.buffer[music_rb.tail] = note;
     music_rb.tail = (music_rb.tail + 1) % MUSIC_BUFFER_SIZE;
-
-    __disable_irq();
     music_rb.count++;
     __enable_irq();
 

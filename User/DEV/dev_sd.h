@@ -3,13 +3,10 @@
 
 #include "bsp_spi.h"
 
-/* SD 卡类型 */
-#define SD_TYPE_ERR  0x00
-#define SD_TYPE_V2HC 0x06
-
 /* SPI 模式命令 */
 #define CMD0   0
 #define CMD8   8
+#define CMD9   9
 #define CMD17  17
 #define CMD24  24
 #define CMD41  41

@@ -176,7 +176,7 @@ void SystemClock_Config(void)
 /* FreeRTOS 启动时通过 portCONFIGURE_TIMER_FOR_RUN_TIME_STATS 调用：初始化并启动 TIM5 */
 void vConfigureTimerForRunTimeStats(void)
 {
-  MX_TIM5_Init();
+  /* TIM5 已在 main() 里 MX_TIM5_Init 初始化，此处只需启动计数 */
   HAL_TIM_Base_Start(&htim5);
 }
 

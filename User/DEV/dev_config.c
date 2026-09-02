@@ -1,4 +1,5 @@
 #include "dev_config.h"
+#include "dev_storage.h"
 #include "ff.h"
 #include <string.h>
 
@@ -21,17 +22,11 @@ void DEV_Config_Init(void)
 
 uint8_t DEV_Config_Load(void)
 {
-    FIL file;
-    UINT br = 0;
     config_t tmp;
-
-    if(f_open(&file,CONFIG_FILE_NAME,FA_READ) != FR_OK)     return 0;
-    if(f_read(&file,&tmp,sizeof(config_t),&br) != FR_OK || br != sizeof(config_t))
+    if(!DEV_Storage_Read(CONFIG_FILE_NAME, (uint8_t*)&tmp, sizeof(config_t)))
     {
-        f_close(&file);
-        return 0;
+        return 0;   /* 文件不存在/CRC损坏 -> 保留默认值 */
     }
-    f_close(&file);
 
     /*校验取值范围，防止旧版本/损坏的 CONFIG.BIN 写入非法值（如全 0 导致黑屏）*/
     if(tmp.sensitivity < 1  || tmp.sensitivity > 10 ||
@@ -48,16 +43,7 @@ uint8_t DEV_Config_Load(void)
 
 uint8_t DEV_Config_Save(void)
 {
-    FIL file;
-    UINT bw = 0;
-    if(f_open(&file,CONFIG_FILE_NAME,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) return 0;
-    if(f_write(&file,&s_config,sizeof(config_t),&bw) != FR_OK || bw != sizeof(config_t))
-    {
-        f_close(&file);
-        return 0;
-    }
-    f_close(&file);
-    return 1;
+    return DEV_Storage_Write(CONFIG_FILE_NAME, (uint8_t*)&s_config, sizeof(config_t));
 }
 
 config_t DEV_Config_Get(void)

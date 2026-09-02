@@ -34,6 +34,9 @@
 #include "bsp_uart.h"
 #include "app_event.h"
 #include "app_ui_model.h"
+#include "bsp_iwdg.h"    
+#include "app_health.h"      
+#include "app_cli.h"     
 extern void TaskInput(void *argument);
 extern void TaskSys(void *argument);
 extern void TaskUI(void *argument);
@@ -147,10 +150,15 @@ void StartDefaultTask(void *argument)
     BSP_Key_Init();
     DEV_EC11_Init();
     APP_Event_Init();
+    APP_Health_Init();      
+    BSP_IWDG_Init();     
+    APP_CLI_Init();        
 
     xTaskCreate(TaskInput, "Input", 256, NULL, 5, NULL);
     xTaskCreate(TaskSys,   "Sys",   1024, NULL, 4, NULL);
     xTaskCreate(TaskUI,    "UI",    512,  NULL, 3, NULL);
+    xTaskCreate(APP_Health_Task, "Health", 512, NULL, 6, NULL); 
+    xTaskCreate(APP_CLI_Task,    "CLI",    512, NULL, 1, NULL); 
 
     vTaskDelete(NULL);   /* defaultTask 完成任务后删除自己 */
   for(;;)
