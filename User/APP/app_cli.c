@@ -60,6 +60,10 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     {
         __HAL_UART_CLEAR_OREFLAG(huart);
         __HAL_UART_CLEAR_FEFLAG(huart);
+        /* ORE 时 HAL 已通过 UART_EndRxTransfer 复位 RxState，但 FE/NE 等非阻塞错误
+         * 不会复位(仍为 BUSY_RX)，此时 HAL_UART_Receive_IT 会返回 HAL_BUSY 导致
+         * 接收中断永久停摆。必须先把 RxState 强制复位为 READY 再重启。 */
+        huart->RxState = HAL_UART_STATE_READY;
         HAL_UART_Receive_IT(&huart1,&s_rx_char,1);
     }
 }

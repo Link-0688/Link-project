@@ -33,10 +33,9 @@ static void timer_cb(TimerHandle_t  xTimer)
     {
         case LED_MODE_OFF : green_on = 0; red_on = 0; break;
         case LED_MODE_GREEN_SOLID : green_on = 1; red_on = 0; break;
-        case LED_MODE_RED_SOLID : green_on = 0; red_on = 1; break;
         case LED_MODE_GREEN_BREATH : 
         {
-            uint8_t duty = breath_brightness(s_phase);  /*0~100*/
+            uint8_t duty = breath_brightness(s_phase);  /*占空比0~100*/
             uint8_t level = (uint8_t)(duty / 10);   /*0~10*/
             green_on = (s_pwm_cnt < level) ? 1 : 0;
             red_on = 0;
@@ -68,9 +67,8 @@ void DEV_StatusLed_SetMode(led_mode_t mode)
 {
     s_mode = mode;
     /*常亮/全灭模式立即刷新*/
-    if(mode == LED_MODE_OFF || mode == LED_MODE_GREEN_SOLID || mode == LED_MODE_RED_SOLID)
+    if(mode == LED_MODE_OFF || mode == LED_MODE_GREEN_SOLID )
     {
         BSP_LED_Set(LED_GREEN,(mode == LED_MODE_GREEN_SOLID) ? 1 : 0);
-        BSP_LED_Set(LED_RED,(mode == LED_MODE_RED_SOLID) ? 1 : 0);
     }
 }

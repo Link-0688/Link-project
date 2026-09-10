@@ -4,7 +4,6 @@
 typedef enum{
     LED_MODE_OFF = 0,   /*全灭*/
     LED_MODE_GREEN_SOLID,   /*绿灯常亮*/
-    LED_MODE_RED_SOLID,     /*红灯常亮*/
     LED_MODE_GREEN_BREATH,  /*绿灯呼吸*/
     LED_MODE_RED_FLASH,     /*红灯快闪*/
 }led_mode_t;
