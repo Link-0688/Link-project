@@ -13,6 +13,7 @@
 #define APP_VERSION "1.5.0"
 #define CLI_RX_BUF_SIZE 128
 #define CLI_LINE_MAX    64
+#define FILL_MAX_EVENTS 64
 
 static volatile uint8_t s_rx_buf[CLI_RX_BUF_SIZE];
 static volatile uint16_t s_rx_head = 0;
@@ -77,6 +78,7 @@ static void cmd_help(void)
     printf("config        show config\r\n");
     printf("ver           version\r\n");
     printf("crash         simulate crash (dump+reset)\r\n");
+    printf("crashclr      clear reset count & reason\r\n");
     printf("stuck <t>     suspend t=input/sys/ui\r\n");
     printf("fill          fill event queue\r\n");
     printf("reset         software reset\r\n");
@@ -111,9 +113,20 @@ static void cmd_stuck(const char *name)
 
 static void cmd_fill(void)
 {
-    uint32_t n = 0;
-    while(APP_Event_Send(EVT_KEY_PRESS,0))  n++;
-    printf("filled %lu events\r\n",(unsigned long)n);
+    uint32_t u32_sent = 0;
+    /*固定次数填充：TaskSys 优先级高于 CLI 会即时消费，用 while(Send) 队列永不填满会死循环*/
+    for(uint32_t u32_i = 0; u32_i < FILL_MAX_EVENTS; u32_i++)
+    {
+        if(APP_Event_Send(EVT_KEY_PRESS,0) == 0)    break;
+        u32_sent++;
+    }
+    printf("filled %lu events\r\n",(unsigned long)u32_sent);
+}
+
+static void cmd_crashclr(void)
+{
+    APP_Health_ClearHistory();
+    printf("\r\ncrash history cleared\r\n");
 }
 
 static void exec_line(char *line)
@@ -129,6 +142,7 @@ static void exec_line(char *line)
     else if(strcmp(line, "config") == 0)     cmd_config();
     else if(strcmp(line, "ver") == 0)        printf("\r\n%s\r\n", APP_VERSION);
     else if(strcmp(line, "crash") == 0)      APP_Health_CrashDump(CRASH_HARDFAULT);
+    else if(strcmp(line, "crashclr") == 0)   cmd_crashclr();
     else if(strncmp(line, "stuck ", 6) == 0) cmd_stuck(line + 6);
     else if(strcmp(line, "fill") == 0)       cmd_fill();
     else if(strcmp(line, "reset") == 0)      NVIC_SystemReset();

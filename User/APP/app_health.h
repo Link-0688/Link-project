@@ -22,5 +22,6 @@ void APP_Health_CrashDump(uint32_t reason_code);    /*崩溃转储+复位*/
 /*供监控页读取上次异常摘要*/
 uint32_t APP_Health_GetResetCount(void);
 const char *APP_Health_GetLastReason(void);
+void APP_Health_ClearHistory(void);     /*清空复位计数/原因(RTC备份域)并删除CRASH.LOG*/
 
 #endif /*__APP_HEALTH_H*/

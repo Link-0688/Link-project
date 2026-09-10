@@ -89,6 +89,20 @@ void APP_Health_CrashDump(uint32_t reason_code)
     for(;;){}
 }
 
+/*清空复位历史：RTC 备份域计数/原因与内存缓存同时归零，并删除 CRASH.LOG*/
+void APP_Health_ClearHistory(void)
+{
+    taskENTER_CRITICAL();
+    s_reset_count = 0;
+    s_last_reason = 0;
+    bkp_write(RTC_BKP_COUNT_REG,0);
+    bkp_write(RTC_BKP_REASON_REG,0);
+    taskEXIT_CRITICAL();
+
+    /*SD 未挂载/文件不存在时忽略失败，不影响计数清零*/
+    f_unlink("CRASH.LOG");
+}
+
 void APP_Health_Task(void *arg)
 {
     (void) arg;

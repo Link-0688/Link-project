@@ -29,6 +29,7 @@ static const uint8_t s_password[PASSWORD_LEN] = {1,2,2,4};
 
 static TickType_t s_last_active_tick = 0;
 static TickType_t s_lock_start_tick = 0;
+static TickType_t s_last_timeout_tick = 0;  /*超时处理节拍，独立于事件流*/
 
 /*工具：读当前状态*/
 static sys_state_t get_state(void)
@@ -351,6 +352,7 @@ void TaskSys(void *argument)
     DEV_StatusLed_Init();
     update_device_led(1);
     s_last_active_tick = xTaskGetTickCount();
+    s_last_timeout_tick = xTaskGetTickCount();
     printf("[SYS] start\r\n");
     for(;;)
     {
@@ -362,8 +364,10 @@ void TaskSys(void *argument)
             s_last_active_tick = xTaskGetTickCount();
             process_event(&evt);
         }
-        else
+        /*超时处理按 tick 独立节拍执行：事件再多也不会被饿死，熄屏/倒计时始终每秒推进*/
+        if((xTaskGetTickCount() - s_last_timeout_tick) >= pdMS_TO_TICKS(1000))
         {
+            s_last_timeout_tick = xTaskGetTickCount();
             process_timeout();
         }
     }
